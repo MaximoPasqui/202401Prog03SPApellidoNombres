@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="/styles.css" />
+  <script src=""></script>
+  <title>Document</title>
+</head>
+
+<body>
+  <div class="mainContainer" id="div_1">
+    <div class="optionsContainer">
+      <p class="titulo">FORM DATOS</p>
+      <table id="myTable" class="dataTable">
+        <tr>
+          <th class="encabezado" id="thId">ID</th>
+          <th class="encabezado" id="thNombre">Nombre</th>
+          <th class="encabezado" id="thApellido">Apellido</th>
+          <th class="encabezado" id="thFechaNac">Fecha Nacimiento</th>
+          <th class="encabezado" id="thDni">DNI</th>
+          <th class="encabezado" id="thPaisOrigen">Pais Origen</th>
+          <th class="encabezado" id="acciones">Modificar</th>
+          <th class="encabezado" id="acciones">Eliminar</th>
+        </tr>
+      </table>
+      <button id="aregar" onclick="setIdLastToForm()">
+        Agregar Elemento
+      </button>
+    </div>
+  </div>
+
+  <div class="hidden" id="div_2">
+    <div class="optionsContainer">
+      <h1 id="tituloForm">Formulario ABM</h1>
+      <select name="" id="userType" class="formInputs" onchange="switchUserTypes()">
+        <option value="vacio">---</option>
+        <option value="ciudadano">Ciudadano</option>
+        <option value="extranjero">Extranjero</option>
+      </select>
+      <div class="form" id="formId">
+        <div class="margin">
+          <label id="labelId">ID: </label>
+          <input type="text" id="inputId" class="formInputs" />
+          <label id="labelNombre">Nombre: </label>
+          <input type="text" id="inputNombre" class="formInputs" />
+          <label id="labelApellido">Apellido: </label>
+          <input type="text" id="inputApellido" class="formInputs" />
+          <label id="labelFechaNacimiento">Fecha Nacimiento: </label>
+          <input type="number" id="inputFechaNac" class="formInputs" />
+          <label id="labelDni">DNI: </label>
+          <input type="number" id="inputDni" class="formInputs" />
+          <label id="labelPaisOrigen">Pais Origen: </label>
+          <input type="text" id="inputPaisOrigen" class="formInputs" />
+        </div>
+      </div>
+      <div class="buttons">
+        <button id="aceptarBtn" onclick="manageUser()">Aceptar</button>
+        <button onclick="OcultarVistaForm()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loader"></div>
+  <div id="overlay"></div>
+  <script>
+
+    function Persona(id, nombre, apellido, fechaNacimiento) {
+      this.id = id;
+      this.nombre = nombre;
+      this.apellido = apellido;
+      this.fechaNacimiento = fechaNacimiento;
+    }
+
+    function Ciudadano(dni, id, nombre, apellido, fechaNacimiento) {
+      this.dni = dni;
+      Persona.call(this, id, nombre, apellido, fechaNacimiento);
+    }
+
+    function Extranjero(paisOrigen, id, nombre, apellido, fechaNacimiento) {
+      this.paisOrigen = paisOrigen;
+      Persona.call(this, id, nombre, apellido, fechaNacimiento);
+    }
+
+    Ciudadano.prototype.__proto__ = Persona.prototype;
+    Extranjero.prototype.__proto__ = Persona.prototype;
+
+    var usuarios = [];
+
+    getUsersWithHttpRequest(setUsersToMemory);
+
+    function setUsersToMemory(json) {
+      json.forEach((e) => {
+        if (e["paisOrigen"] == null) {
+          usuarios.push(
+            new Ciudadano(
+              e['dni'],
+              e['id'],
+              e["nombre"],
+              e["apellido"],
+              e["fechaNacimiento"],
+            )
+          );
+        } else {
+          usuarios.push(
+            new Extranjero(
+              e["paisOrigen"],
+              e["id"],
+              e["nombre"],
+              e["apellido"],
+              e["fechaNacimiento"],
+            )
+          );
+        }
+      });
+      setTableData();
+    }
+
+    function addUserToMemory(res, usuario) {
+      console.log(res);
+      if (res.status == 200) {
+        usuarios.push(usuario);
+        setTableData();
+      } else {
+        OcultarVistaForm();
+        alert("No se pudo agregar el usuario!");
+      }
+    }
+
+    function getUsersWithHttpRequest(callback) {
+
+      showLoader();
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", "https://examenesutn.vercel.app/api/PersonaCiudadanoExtranjero", true);
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4) {
+          if (xhr.status == 200) {
+            console.log(xhr.status);
+            hideLoader();
+            const jsonResponse = JSON.parse(xhr.responseText);
+            callback(jsonResponse);
+          } else {
+            hideLoader();
+            alert("Error, status code: " + xhr.status);
+          }
+        }
+      };
+      xhr.send();
+    }
+
+    function addUserWithPromises(userData) {
+      showLoader();
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "https://examenesutn.vercel.app/api/PersonaCiudadanoExtranjero", true);
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState == 4) {
+            hideLoader();
+            if (xhr.status == 200) {
+              resolve(xhr);
+            } else {
+              hideLoader();
+              OcultarVistaForm();
+              alert("Error del servidor");
+            }
+          }
+        };
+        xhr.send(JSON.stringify(userData));
+      })
+    }
+
+    function modifyUserWithPromises(userData) {
+      showLoader();
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(
+          "PUT",
+          "https://examenesutn.vercel.app/api/PersonaCiudadanoExtranjero",
+          true
+        );
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState == 4) {
+            hideLoader();
+            if (xhr.status == 200) {
+              try {
+                resolve(xhr);
+              } catch (e) {
+                reject(e);
+              }
+            } else {
+              hideLoader();
+              OcultarVistaForm();
+              alert("Error del servidor");
+            }
+          }
+        };
+        xhr.send(JSON.stringify(userData));
+      });
+    }
+
+    function deleteUserWithHttpRequest(userData, callback) {
+      showLoader();
+      const xhr = new XMLHttpRequest();
+      xhr.open(
+        "DELETE",
+        "https://examenesutn.vercel.app/api/PersonaCiudadanoExtranjero",
+        true
+      );
+      xhr.setRequestHeader("Content-Type", "application/json");
+
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4) {
+          if (xhr.status == 200) {
+            callback(xhr);
+          } else {
+            hideLoader();
+            alert("Error de servidor");
+          }
+
+        }
+      };
+      xhr.send(JSON.stringify(userData));
+    }
+
+    function setTableData() {
+      vaciarTabla();
+      var myTable = document.getElementById("myTable");
+      for (var i = 0; i < usuarios.length; i++) {
+        var row = myTable.insertRow(-1);
+        row.insertCell(0).innerHTML = usuarios[i].id;
+        row.insertCell(1).innerHTML = usuarios[i].nombre;
+        row.insertCell(2).innerHTML = usuarios[i].apellido;
+        row.insertCell(3).innerHTML = usuarios[i].fechaNacimiento || "-";
+        row.insertCell(4).innerHTML = usuarios[i].dni || "-";
+        row.insertCell(5).innerHTML = usuarios[i].paisOrigen || "-";
+        row.insertCell(6).innerHTML =
+          '<button onclick="modificarUsuario(' +
+          usuarios[i].id +
+          ')">Modificar</button>';
+        row.insertCell(7).innerHTML =
+          '<button onclick="eliminarUsuario(' +
+          usuarios[i].id +
+          ')">Eliminar</button>';
+      }
+    }
+
+    function showLoader() {
+      document.getElementById("loader").style.display = "block";
+      document.getElementById("overlay").style.display = "block";
+    }
+
+    function hideLoader() {
+      document.getElementById("loader").style.display = "none";
+      document.getElementById("overlay").style.display = "none";
+    }
+
+    function vaciarTabla() {
+      var myTable = document.getElementById("myTable");
+      while (myTable.rows.length > 1) {
+        myTable.deleteRow(1);
+      }
+    }
+
+    function modificarUsuario(id) {
+      document.getElementById('tituloForm').textContent = 'Modificar Usuario';
+      OcultarVistaMain();
+      setFormInputs(id);
+    }
+
+    function eliminarUsuario(id) {
+      document.getElementById('tituloForm').textContent = 'Eliminar Usuario';
+      OcultarVistaMain();
+      setFormInputs(id);
+      document.getElementById('aceptarBtn').addEventListener('click', function () {
+        if (confirm("Seguro que desea eliminar este usuario?")) {
+          var userIndex = usuarios.findIndex((usuario) => usuario.id === id);
+          if (userIndex !== -1) {
+            deleteUserWithHttpRequest(usuarios[userIndex], function (res) {
+              if (res.status == 200) {
+                usuarios.splice(userIndex, 1);
+                setTableData();
+                alert('eliminado');
+              } else {
+                alert("Error!");
+              }
+              hideLoader();
+            })
+          }
+        }
+      }, { once: true });
+
+    }
+
+    function OcultarVistaMain() {
+      var div_1 = document.getElementById("div_1");
+      var div_2 = document.getElementById("div_2");
+      div_1.classList.replace("mainContainer", "hidden");
+      div_2.classList.replace("hidden", "formContainer");
+    }
+
+    function OcultarVistaForm() {
+      document.getElementById('tituloForm').textContent = 'Alta Usuario';
+      var div_1 = document.getElementById("div_1");
+      var div_2 = document.getElementById("div_2");
+      div_1.classList.replace("hidden", "mainContainer");
+      div_2.classList.replace("formContainer", "hidden");
+      clearForm();
+    }
+
+    function switchUserTypes() {
+      var userType = document.getElementById("userType").value;
+      switch (userType) {
+        case "ciudadano":
+          document.getElementById("formId").style.display = "flex";
+          document.getElementById("inputPaisOrigen").style.display = "none";
+          document.getElementById("inputDni").style.display = "block";
+          document.getElementById("labelPaisOrigen").style.display = "none";
+          document.getElementById("labelDni").style.display = "block";
+          break;
+        case "extranjero":
+          document.getElementById("formId").style.display = "flex";
+          document.getElementById("inputPaisOrigen").style.display = "block";
+          document.getElementById("inputDni").style.display = "none";
+          document.getElementById("labelPaisOrigen").style.display = "block";
+          document.getElementById("labelDni").style.display = "none";
+          break;
+        case "vacio":
+          document.getElementById("formId").style.display = "none";
+          break;
+      }
+    }
+
+    function setFormInputs(id) {
+      var index = usuarios.findIndex((usuario) => usuario.id === id);
+      var user = usuarios[index];
+      document.getElementById("inputId").value = user.id;
+      document.getElementById("inputId").disabled = true;
+      document.getElementById("inputNombre").value = user.nombre;
+      document.getElementById("inputApellido").value = user.apellido;
+      document.getElementById("inputFechaNac").value = user.fechaNacimiento;
+      document.getElementById("inputDni").value = user.dni;
+      document.getElementById("inputPaisOrigen").value = user.paisOrigen;
+
+      if (user instanceof Ciudadano) {
+        document.getElementById("labelPaisOrigen").style.display = "none";
+        document.getElementById("inputPaisOrigen").style.display = "none";
+        document.getElementById("userType").value = "ciudadano";
+        document.getElementById("userType").style.display = "none";
+        switchUserTypes();
+      } else if (user instanceof Extranjero) {
+        document.getElementById("labelDni").style.display = "none";
+        document.getElementById("inputDni").style.display = "none";
+        document.getElementById("userType").value = "extranjero";
+        document.getElementById("userType").style.display = "none";
+        switchUserTypes();
+      } else {
+        document.getElementById("userType").value = "vacio";
+        switchUserTypes();
+      }
+    }
+
+    async function manageUser() {
+      var id = document.getElementById("inputId").value;
+      var nombre = document.getElementById("inputNombre").value;
+      var apellido = document.getElementById("inputApellido").value;
+      var fechaNacimiento = document.getElementById("inputFechaNac").value;
+      var dni = document.getElementById("inputDni").value;
+      var paisOrigen = document.getElementById("inputPaisOrigen").value;
+      var userType = document.getElementById("userType").value;
+      var allowed = false;
+
+      var userFound = usuarios.find(function (usuario) {
+        return usuario.id === parseInt(id);
+      });
+
+      if (userFound) {
+
+        if (userFound instanceof Ciudadano) {
+          if (isValidCiudadano(nombre, apellido, dni, fechaNacimiento)) {
+            modifyUserWithPromises(
+              new Ciudadano(
+                parseInt(dni),
+                parseInt(id),
+                nombre,
+                apellido,
+                parseInt(fechaNacimiento)
+              )
+            ).then((res) => {
+              console.log(res);
+              if (res.status == 200) {
+                userFound.dni = parseInt(dni);
+                userFound.apellido = apellido;
+                userFound.nombre = nombre;
+                userFound.fechaNacimiento = parseInt(fechaNacimiento);
+                setTableData();
+              }
+            });
+            allowed = true;
+          } else {
+            alert(
+              "Debe completar todos los campos. (Revise la fecha de nacimiento)."
+            );
+          }
+        } else if (userFound instanceof Extranjero) {
+          if (isValidExtranjero(nombre, apellido, paisOrigen, fechaNacimiento)) {
+            modifyUserWithPromises(
+              new Extranjero(
+                paisOrigen,
+                parseInt(id),
+                nombre,
+                apellido,
+                parseInt(fechaNacimiento)
+              )
+            ).then((res) => {
+              if (res.status == 200) {
+                userFound.paisOrigen = paisOrigen;
+                userFound.apellido = apellido;
+                userFound.nombre = nombre;
+                userFound.fechaNacimiento = parseInt(fechaNacimiento);
+                setTableData();
+              }
+            });
+            allowed = true;
+          } else {
+            alert(
+              "Debe completar todos los campos. (Revise la fecha de nacimiento)."
+            );
+          }
+        }
+      } else {
+        var newUser;
+        switch (userType) {
+          case "ciudadano":
+            if (isValidCiudadano(nombre, apellido, dni, fechaNacimiento)) {
+              var res = await addUserWithPromises({
+                nombre: nombre,
+                apellido: apellido,
+                fechaNacimiento: fechaNacimiento,
+                dni: dni,
+              }).catch((e) => {
+                console.log(e);
+              });
+
+              addUserToMemory(res, new Ciudadano(
+                parseInt(dni),
+                parseInt(JSON.parse(res.responseText).id),
+                nombre,
+                apellido,
+                parseInt(fechaNacimiento)
+              ));
+              allowed = true;
+            } else {
+              alert(
+                "Debe completar todos los campos. (Revise la fecha de nacimiento)."
+              );
+            }
+            break;
+          case "extranjero":
+            if (isValidExtranjero(nombre, apellido, paisOrigen, fechaNacimiento)) {
+              var res = await addUserWithPromises({
+                nombre: nombre,
+                apellido: apellido,
+                fechaNacimiento: fechaNacimiento,
+                paisOrigen: paisOrigen,
+              });
+
+              addUserToMemory(res, new Extranjero(
+                paisOrigen,
+                parseInt(JSON.parse(res.responseText).id),
+                nombre,
+                apellido,
+                parseInt(fechaNacimiento)
+              ));
+              allowed = true;
+            } else {
+              alert(
+                "Debe completar todos los campos. (Revise la fecha de nacimiento)."
+              );
+            }
+            break;
+          case "vacio":
+            alert("Debe seleccionar un tipo de usuario en el popUp.");
+            break;
+        }
+      }
+      if (allowed) {
+        clearForm();
+        OcultarVistaForm();
+      }
+    }
+
+    function setIdLastToForm() {
+      OcultarVistaMain();
+      inputId.disabled = true;
+    }
+
+    function isValidCiudadano(nombre, apellido, dni, fechaNacimiento) {
+      return nombre !== '' && apellido !== '' && dni > 0 && fechaNacimiento.length === 8 && parseInt(fechaNacimiento.substring(0, 4)) <= 2024;
+    }
+
+    function isValidExtranjero(nombre, apellido, origen, fechaNacimiento) {
+      return nombre !== '' && apellido !== '' && origen !== '' && fechaNacimiento.length === 8 && parseInt(fechaNacimiento.substring(0, 4)) <= 2024;
+    }
+
+    function clearForm() {
+      document.getElementById("inputId").value = "";
+      document.getElementById("inputNombre").value = "";
+      document.getElementById("inputApellido").value = "";
+      document.getElementById("inputFechaNac").value = "";
+      document.getElementById("inputDni").value = "";
+      document.getElementById("inputPaisOrigen").value = "";
+      document.getElementById("labelId").style.display = "block";
+      document.getElementById("labelDni").style.display = "block";
+      document.getElementById("labelPaisOrigen").style.display = "block";
+      document.getElementById("labelFechaNacimiento").style.display = "block";
+      document.getElementById("inputId").style.display = "block";
+      document.getElementById("inputDni").style.display = "block";
+      document.getElementById("inputFechaNac").style.display = "block";
+      document.getElementById("userType").style.display = "block";
+      document.getElementById("userType").value = "vacio";
+    }
+  </script>
+</body>
+
+</html>
